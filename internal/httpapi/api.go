@@ -212,6 +212,11 @@ func (a *API) processEvent(ctx context.Context, q eventReq) (*store.Microclimate
 			return nil, "validation_failed", errors.New("unknown rule_version")
 		}
 	}
+	// Observe the cancellation signal before performing the side-effectful
+	// Create call so a cancelled request does not persist a disposal ticket.
+	if err := ctx.Err(); err != nil {
+		return nil, "cancelled", err
+	}
 	c, e := a.core.Create(q.CabinetID, rules.SensorSnapshot{Temperature: *q.Temperature, Humidity: *q.Humidity, DurationMinutes: *q.DurationMinutes, CollectedAt: q.CollectedAt, TemperatureUnit: q.TemperatureUnit, HumidityUnit: q.HumidityUnit}, q.ArtifactSensitivity, q.IdempotencyKey, q.RuleVersion, q.CalibrationAt, q.SensorSerial)
 	if e != nil {
 		if errors.Is(e, store.ErrIdempotencyConflict) {
@@ -219,11 +224,6 @@ func (a *API) processEvent(ctx context.Context, q eventReq) (*store.Microclimate
 		} else {
 			return nil, "validation_failed", e
 		}
-	}
-	// BUG(seed): cancellation is observed only after Create has already
-	// committed the case through the domain and store layers.
-	if err := ctx.Err(); err != nil {
-		return nil, "cancelled", err
 	}
 	if replay == nil {
 		return c, "replay", nil
