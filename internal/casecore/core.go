@@ -1288,6 +1288,17 @@ func (s *Service) GetByIdempotency(key string) (*store.MicroclimateCase, error) 
 }
 
 func (s *Service) GetByEvent(cabinet, collectedAt string) (*store.MicroclimateCase, error) {
+	// Normalize the collection timestamp to the same UTC RFC3339Nano form
+	// used by Create (via rules.NormalizeSnapshot) when building the store's
+	// byEvent index. Without this, requests carrying a non-UTC timezone
+	// offset (e.g. +08:00) would never match the normalized key and the
+	// replay pre-check would fail, causing duplicate requests to be
+	// reported as new (201) instead of idempotent replays (200).
+	if collectedAt != "" {
+		if t, err := time.Parse(time.RFC3339, collectedAt); err == nil {
+			collectedAt = t.UTC().Format(time.RFC3339Nano)
+		}
+	}
 	return s.st.FindByEvent(strings.TrimSpace(cabinet), collectedAt)
 }
 func (s *Service) List(cab, status string, risk rules.RiskLevel) ([]*store.MicroclimateCase, int, string) {
