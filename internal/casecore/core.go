@@ -600,7 +600,15 @@ func (s *Service) AddInspectionWithRole(id, inspector string, rec store.Inspecti
 					rec.StabilityResetReason = c.Stability.LastFailure
 				}
 			}
-			if !qualified {
+			if rec.Oscillation {
+				// Oscillation already reset Stability.Count and Qualified above; do not
+				// let the qualified-retest path add the count back in the same check.
+				// Keep Count at 0 and Qualified false so accumulation restarts from
+				// the next stable retest.
+				c.Stability.Count = 0
+				c.Stability.Qualified = false
+				qualified = false
+			} else if !qualified {
 				c.Stability.Count = 0
 				c.Stability.LastFailure = "读数未回到阈值内"
 				rec.StabilityResetReason = c.Stability.LastFailure
