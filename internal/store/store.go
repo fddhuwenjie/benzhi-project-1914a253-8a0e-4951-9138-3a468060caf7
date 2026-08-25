@@ -308,16 +308,23 @@ func (s *Store) persist() {
 		_ = os.Rename(tmp, s.path)
 	}
 }
-func (s *Store) appendEvent(ev AuditEvent) {
+func (s *Store) appendEvent(ev AuditEvent) error {
 	if s.path == "" {
-		return
+		return nil
 	}
-	b, _ := json.Marshal(ev)
+	b, err := json.Marshal(ev)
+	if err != nil {
+		return err
+	}
 	f, err := os.OpenFile(s.path+".events.jsonl", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err == nil {
-		_, _ = f.Write(append(b, '\n'))
-		_ = f.Close()
+	if err != nil {
+		return err
 	}
+	if _, err = f.Write(append(b, '\n')); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 func eventHash(ev AuditEvent) string {
