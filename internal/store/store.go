@@ -363,7 +363,9 @@ func (s *Store) Create(c *MicroclimateCase) error {
 	event.Hash = eventHash(event)
 	c.AuditEvents = append(c.AuditEvents, event)
 	s.cases[c.ID] = clone(c)
-	s.appendEvent(event)
+	if c.IdempotencyKey == "" {
+		s.appendEvent(event)
+	}
 	s.persist()
 	return nil
 }
