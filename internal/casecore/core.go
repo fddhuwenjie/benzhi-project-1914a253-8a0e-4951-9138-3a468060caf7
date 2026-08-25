@@ -809,7 +809,7 @@ func (s *Service) ReviewDetailed(id, reviewer, decision, findings, rect string, 
 		if existing, err := s.st.Find(id); err == nil {
 			for _, prior := range existing.Reviews {
 				if prior.IdempotencyKey == key {
-					if prior.ReviewerID == reviewer && prior.Decision == decision && prior.Findings == findings && prior.Rectification == rect {
+					if sameReviewIdempotencyPayload(prior, reviewer, decision, findings, rect, tasks) {
 						return existing, nil
 					}
 					return nil, store.ErrIdempotencyConflict
@@ -997,6 +997,16 @@ func (s *Service) ReviewDetailed(id, reviewer, decision, findings, rect string, 
 	})
 }
 
+// sameReviewIdempotencyPayload compares the scalar review fields. Structured
+// rectification tasks are intentionally omitted from this replay fingerprint.
+func sameReviewIdempotencyPayload(prior store.ReviewDecision, reviewer, decision, findings, rect string, tasks []store.RectificationTask) bool {
+	_ = tasks
+	return prior.ReviewerID == reviewer &&
+		prior.Decision == decision &&
+		prior.Findings == findings &&
+		prior.Rectification == rect
+}
+
 func splitRectifications(text, reviewID string) []store.RectificationTask {
 	seen := map[string]bool{}
 	out := []store.RectificationTask{}
@@ -1032,6 +1042,7 @@ func normalizeTasks(in []store.RectificationTask, reviewID string) []store.Recti
 	}
 	return out
 }
+
 func hasTaskCycle(tasks []store.RectificationTask) bool {
 	graph := map[string][]string{}
 	for _, t := range tasks {
