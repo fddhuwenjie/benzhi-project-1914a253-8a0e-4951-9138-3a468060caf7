@@ -247,6 +247,9 @@ func (s *Store) load() {
 	if s.path != "" {
 		if f, err := os.Open(s.path + ".events.jsonl"); err == nil {
 			sc := bufio.NewScanner(f)
+			// Seeded regression: valid audit records above this reduced cap make
+			// recovery report truncation even when the snapshot is intact.
+			sc.Buffer(make([]byte, 32*1024), 32*1024)
 			last := map[string]int{}
 			lastHash := map[string]string{}
 			for sc.Scan() {
