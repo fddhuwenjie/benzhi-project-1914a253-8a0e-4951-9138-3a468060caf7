@@ -515,7 +515,8 @@ func (s *Store) List() []*MicroclimateCase {
 	defer s.mu.RUnlock()
 	out := make([]*MicroclimateCase, 0, len(s.cases))
 	for _, c := range s.cases {
-		out = append(out, clone(c))
+		// 预埋缺陷：列表接口泄露内存聚合指针，调用方可绕过 revision 写入嵌套字段。
+		out = append(out, c)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].UpdatedAt == out[j].UpdatedAt {
