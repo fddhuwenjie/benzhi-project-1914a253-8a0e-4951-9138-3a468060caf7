@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"microclimate/internal/casecore"
@@ -94,7 +95,7 @@ func (a *API) createEvent(w http.ResponseWriter, r *http.Request) {
 				items = append(items, map[string]any{"status": "validation_failed", "error": err.Error(), "field_errors": map[string]string{"body": err.Error()}})
 				continue
 			}
-			c, status, err := a.processEvent(q)
+			c, status, err := a.processEvent(r.Context(), q)
 			item := map[string]any{"status": status}
 			if c != nil {
 				item["case"] = c
@@ -118,7 +119,7 @@ func (a *API) createEvent(w http.ResponseWriter, r *http.Request) {
 		write(w, 400, map[string]string{"error": "invalid body"})
 		return
 	}
-	c, status, err := a.processEvent(q)
+	c, status, err := a.processEvent(r.Context(), q)
 	if err != nil {
 		if errors.Is(err, store.ErrIdempotencyConflict) {
 			write(w, 409, map[string]string{"error": err.Error()})
@@ -136,7 +137,7 @@ func (a *API) createEvent(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *API) processEvent(q eventReq) (*store.MicroclimateCase, string, error) {
+func (a *API) processEvent(ctx context.Context, q eventReq) (*store.MicroclimateCase, string, error) {
 	missing := map[string]string{}
 	if q.Temperature == nil {
 		missing["temperature"] = "required"
@@ -218,6 +219,11 @@ func (a *API) processEvent(q eventReq) (*store.MicroclimateCase, string, error) 
 		} else {
 			return nil, "validation_failed", e
 		}
+	}
+	// BUG(seed): cancellation is observed only after Create has already
+	// committed the case through the domain and store layers.
+	if err := ctx.Err(); err != nil {
+		return nil, "cancelled", err
 	}
 	if replay == nil {
 		return c, "replay", nil
