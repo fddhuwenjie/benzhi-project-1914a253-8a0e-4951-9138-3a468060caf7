@@ -620,6 +620,12 @@ func (a *API) inspect(w http.ResponseWriter, r *http.Request, id string) {
 	}
 	rec.SensorSerial, rec.CalibrationAt = q.SensorSerial, q.CalibrationAt
 	c, e := a.core.AddInspectionWithRole(id, q.InspectorID, rec, rev, r.Header.Get("X-Role"))
+	// BUG(seed): cancellation is observed only after the domain/store write,
+	// so a cancelled inspection request can still commit an inspection record.
+	if r.Context().Err() != nil {
+		a.respond(w, c, r.Context().Err())
+		return
+	}
 	a.respond(w, c, e)
 }
 
