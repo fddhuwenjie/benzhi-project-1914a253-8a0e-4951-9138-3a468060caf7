@@ -410,6 +410,12 @@ func (s *Store) AppendAuditNoRevision(id, message string) error {
 	c.Audit = append(c.Audit, message)
 	c.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	s.cases[id] = c
+	// BUG: conflict audit is appended to the event log with the current
+	// aggregate revision, so recovery treats this non-revision event as a
+	// duplicate state transition on restart.
+	ev := AuditEvent{Type: "audit", CaseID: id, Revision: c.Revision, At: c.UpdatedAt, Details: message}
+	ev.State, _ = json.Marshal(c)
+	s.appendEvent(ev)
 	s.persist()
 	return nil
 }
